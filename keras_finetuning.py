@@ -44,17 +44,19 @@ from keras import optimizers
 from keras.models import Sequential
 from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.layers import Activation, Dropout, Flatten, Dense
+import keras
 
 # path to the model weights files.
-weights_path = '../keras/examples/vgg16_weights.h5'
-top_model_weights_path = 'fc_model.h5'
+weights_path = 'vgg16_weights.h5'
+top_model_weights_path = 'bottleneck_fc_model.h5'
+finetuned_weights = 'finetuned_weights.h5'
 # dimensions of our images.
-img_width, img_height = 150, 150
+img_width, img_height = 300, 300
 
-train_data_dir = 'data/train'
-validation_data_dir = 'data/validation'
-nb_train_samples = 2000
-nb_validation_samples = 800
+train_data_dir = 'data/train - small'
+validation_data_dir = 'data/validation_X'
+nb_train_samples = 1984
+nb_validation_samples = 1216
 nb_epoch = 50
 
 # build the VGG16 network
@@ -159,10 +161,13 @@ validation_generator = test_datagen.flow_from_directory(
         batch_size=32,
         class_mode='binary')
 
+cb = keras.callbacks.CSVLogger('log_epochs.csv', separator=',', append=False)
 # fine-tune the model
 model.fit_generator(
-        train_generator,
+        train_generator, callbacks =[cb],
         samples_per_epoch=nb_train_samples,
         nb_epoch=nb_epoch,
         validation_data=validation_generator,
         nb_val_samples=nb_validation_samples)
+
+model.save_weights(finetuned_weights)

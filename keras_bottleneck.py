@@ -42,21 +42,24 @@ from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential
 from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.layers import Activation, Dropout, Flatten, Dense
+import keras
 
 # path to the model weights file.
-weights_path = '../keras/examples/vgg16_weights.h5'
+weights_path = 'vgg16_weights.h5'
 top_model_weights_path = 'bottleneck_fc_model.h5'
 # dimensions of our images.
-img_width, img_height = 150, 150
+img_width, img_height = 300, 300
 
-train_data_dir = 'data/train'
-validation_data_dir = 'data/validation'
-nb_train_samples = 2000
-nb_validation_samples = 800
-nb_epoch = 50
+train_data_dir = 'data/train - small'
+validation_data_dir = 'data/validation_X'
+nb_train_samples = 1984
+nb_validation_samples = 1216
+nb_epoch = 150
+dropout = 0.9
 
 
-def save_bottlebeck_features():
+
+def save_bottleneck_features():
     datagen = ImageDataGenerator(rescale=1./255)
 
     # build the VGG16 network
@@ -121,7 +124,9 @@ def save_bottlebeck_features():
             class_mode=None,
             shuffle=False)
     bottleneck_features_train = model.predict_generator(generator, nb_train_samples)
-    np.save(open('bottleneck_features_train.npy', 'w'), bottleneck_features_train)
+    np.save('bottleneck_features_train.npy', bottleneck_features_train)
+    
+    print('Bottleneck trained.')
 
     generator = datagen.flow_from_directory(
             validation_data_dir,
@@ -130,29 +135,41 @@ def save_bottlebeck_features():
             class_mode=None,
             shuffle=False)
     bottleneck_features_validation = model.predict_generator(generator, nb_validation_samples)
-    np.save(open('bottleneck_features_validation.npy', 'w'), bottleneck_features_validation)
+    np.save('bottleneck_features_validation.npy', bottleneck_features_validation)
+    
+    print('Bottleneck validated.')
 
 
 def train_top_model():
-    train_data = np.load(open('bottleneck_features_train.npy'))
-    train_labels = np.array([0] * (nb_train_samples / 2) + [1] * (nb_train_samples / 2))
+    train_data = np.load('bottleneck_features_train.npy')
+    train_labels = np.array([0] * int(nb_train_samples / 2) + [1] * int(nb_train_samples / 2))
+    print(train_labels)
+    
 
-    validation_data = np.load(open('bottleneck_features_validation.npy'))
-    validation_labels = np.array([0] * (nb_validation_samples / 2) + [1] * (nb_validation_samples / 2))
+    validation_data = np.load('bottleneck_features_validation.npy')
+    validation_labels = np.array([0] * int(nb_validation_samples / 2) + [1] * int(nb_validation_samples / 2))
+    print(validation_labels)
 
     model = Sequential()
     model.add(Flatten(input_shape=train_data.shape[1:]))
     model.add(Dense(256, activation='relu'))
-    model.add(Dropout(0.5))
+    model.add(Dropout(dropout))
     model.add(Dense(1, activation='sigmoid'))
 
     model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
 
-    model.fit(train_data, train_labels,
+#    cb = keras.callbacks.TensorBoard(log_dir='/logs', histogram_freq=1, write_graph=True, write_images=False)
+    cb = keras.callbacks.CSVLogger('log_epochs.csv', separator=',', append=False)
+    model.fit(train_data, train_labels, verbose=2, callbacks=[cb],
               nb_epoch=nb_epoch, batch_size=32,
               validation_data=(validation_data, validation_labels))
     model.save_weights(top_model_weights_path)
 
-
-save_bottlebeck_features()
-train_top_model()
+def bn_training(train_data_dir, validation_data_dir, nb_training_samples, 
+                nb_validation_samples, nb_epoch, dropout):
+    save_bottleneck_features()
+    train_top_model()
+    
+if __name__ == '__main__':
+    save_bottleneck_features()
+    train_top_model()
