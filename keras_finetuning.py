@@ -44,6 +44,8 @@ from keras import optimizers
 from keras.models import Sequential
 from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.layers import Activation, Dropout, Flatten, Dense
+from matplotlib import pyplot as plt
+from keras.regularizers import l1, l2
 import keras
 
 # path to the model weights files.
@@ -53,11 +55,13 @@ finetuned_weights = 'finetuned_weights.h5'
 # dimensions of our images.
 img_width, img_height = 300, 300
 
-train_data_dir = 'data/train - small'
-validation_data_dir = 'data/validation_X'
-nb_train_samples = 1984
-nb_validation_samples = 1216
+train_data_dir = 'data/random1000'#'data/random1000'
+validation_data_dir = 'data/validation_A'#'data/aug_1024'
+nb_train_samples = 4096
+nb_validation_samples = 2944
 nb_epoch = 50
+dropout = 0.5
+l2_c = 0.15
 
 # build the VGG16 network
 model = Sequential()
@@ -117,8 +121,8 @@ print('Model loaded.')
 # build a classifier model to put on top of the convolutional model
 top_model = Sequential()
 top_model.add(Flatten(input_shape=model.output_shape[1:]))
-top_model.add(Dense(256, activation='relu'))
-top_model.add(Dropout(0.5))
+top_model.add(Dense(256, W_regularizer=l2(l2_c), activation='relu'))
+top_model.add(Dropout(dropout))
 top_model.add(Dense(1, activation='sigmoid'))
 
 # note that it is necessary to start with a fully-trained
@@ -163,11 +167,28 @@ validation_generator = test_datagen.flow_from_directory(
 
 cb = keras.callbacks.CSVLogger('log_epochs.csv', separator=',', append=False)
 # fine-tune the model
-model.fit_generator(
+history = model.fit_generator(
         train_generator, callbacks =[cb],
         samples_per_epoch=nb_train_samples,
         nb_epoch=nb_epoch,
         validation_data=validation_generator,
         nb_val_samples=nb_validation_samples)
+
+plt.plot(history.history['acc'])
+plt.plot(history.history['val_acc'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
+
+plt.figure()
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
 
 model.save_weights(finetuned_weights)
