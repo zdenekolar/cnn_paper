@@ -1,40 +1,3 @@
-'''This script goes along the blog post
-"Building powerful image classification models using very little data"
-from blog.keras.io.
-It uses data that can be downloaded at:
-https://www.kaggle.com/c/dogs-vs-cats/data
-In our setup, we:
-- created a data/ folder
-- created train/ and validation/ subfolders inside data/
-- created cats/ and dogs/ subfolders inside train/ and validation/
-- put the cat pictures index 0-999 in data/train/cats
-- put the cat pictures index 1000-1400 in data/validation/cats
-- put the dogs pictures index 12500-13499 in data/train/dogs
-- put the dog pictures index 13500-13900 in data/validation/dogs
-So that we have 1000 training examples for each class, and 400 validation examples for each class.
-In summary, this is our directory structure:
-```
-data/
-    train/
-        dogs/
-            dog001.jpg
-            dog002.jpg
-            ...
-        cats/
-            cat001.jpg
-            cat002.jpg
-            ...
-    validation/
-        dogs/
-            dog001.jpg
-            dog002.jpg
-            ...
-        cats/
-            cat001.jpg
-            cat002.jpg
-            ...
-```
-'''
 import os
 import h5py
 import numpy as np
@@ -46,15 +9,15 @@ from keras import optimizers
 from matplotlib import pyplot as plt
 from keras.regularizers import l1, l2
 import keras
-
-# path to the model weights file.
-weights_path = 'vgg16_weights.h5'
-top_model_weights_path = 'bottleneck_fc_model.h5'
-# dimensions of our images.
-img_width, img_height = 300, 300
+from vgg16_lower_part import vgg16_lower_part
 
 train_data_dir = 'data/random1000'
 validation_data_dir = 'data/validation_A'
+
+weights_path = 'vgg16_weights.h5'
+top_model_weights_path = 'bottleneck_fc_model.h5'
+img_width, img_height = 300, 300
+
 nb_train_samples = 4096
 nb_validation_samples = 2944
 nb_epoch = 50
@@ -62,64 +25,17 @@ dropout = 0.5
 l2_c = 0.2
 
 
-
 def save_bottleneck_features():
-    datagen = ImageDataGenerator(rescale=1./255)#127.5-127.5)
+    '''
+    Load trained VGG-16 network.
+    Load weights.
+    Extract the features from the last layer into bottleneck_features_train.npy
+    Extarct the features from the last layer to bottleneck_features_validation.npy
+    :return: None
+    '''
+    datagen = ImageDataGenerator(rescale=1./255)
 
-    # build the VGG16 network
-    model = Sequential()
-    model.add(ZeroPadding2D((1, 1), input_shape=(3, img_width, img_height)))
-
-    model.add(Convolution2D(64, 3, 3, activation='relu', name='conv1_1'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(64, 3, 3, activation='relu', name='conv1_2'))
-    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(128, 3, 3, activation='relu', name='conv2_1'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(128, 3, 3, activation='relu', name='conv2_2'))
-    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(256, 3, 3, activation='relu', name='conv3_1'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(256, 3, 3, activation='relu', name='conv3_2'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(256, 3, 3, activation='relu', name='conv3_3'))
-    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, 3, 3, activation='relu', name='conv4_1'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, 3, 3, activation='relu', name='conv4_2'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, 3, 3, activation='relu', name='conv4_3'))
-    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, 3, 3, activation='relu', name='conv5_1'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, 3, 3, activation='relu', name='conv5_2'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, 3, 3, activation='relu', name='conv5_3'))
-    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
-    # load the weights of the VGG16 networks
-    # (trained on ImageNet, won the ILSVRC competition in 2014)
-    # note: when there is a complete match between your model definition
-    # and your weight savefile, you can simply call model.load_weights(filename)
-    assert os.path.exists(weights_path), 'Model weights not found (see "weights_path" variable in script).'
-    f = h5py.File(weights_path)
-    for k in range(f.attrs['nb_layers']):
-        if k >= len(model.layers):
-            # we don't look at the last (fully-connected) layers in the savefile
-            break
-        g = f['layer_{}'.format(k)]
-        weights = [g['param_{}'.format(p)] for p in range(g.attrs['nb_params'])]
-        model.layers[k].set_weights(weights)
-    f.close()
-    print('Model loaded.')
+    model = vgg16_lower_part(img_width, img_height, weights_path)
 
     generator = datagen.flow_from_directory(
             train_data_dir,
@@ -145,6 +61,12 @@ def save_bottleneck_features():
 
 
 def train_top_model():
+    '''
+    Load the features from save_bottleneck_features.
+    Create a new fully connected network (just like from the end of VGG-16).
+    Train the network.
+    :return:
+    '''
     train_data = np.load('bottleneck_features_train.npy')
     train_labels = np.array([0] * int(nb_train_samples / 2) + [1] * int(nb_train_samples / 2))
     
@@ -157,18 +79,23 @@ def train_top_model():
     model.add(Dropout(dropout))
     model.add(Dense(1, activation='sigmoid'))
 
-#    model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
     sgd = keras.optimizers.SGD(lr=0.001, momentum=0.0, decay=0.0, nesterov=False)
     
     model.compile(optimizer=sgd, loss='binary_crossentropy', metrics=['accuracy'])
 
-#    cb = keras.callbacks.TensorBoard(log_dir='/logs', histogram_freq=1, write_graph=True, write_images=False)
     cb = keras.callbacks.CSVLogger('log_epochs.csv', separator=',', append=False)
     history = model.fit(train_data, train_labels, verbose=2, callbacks=[cb],
               nb_epoch=nb_epoch, batch_size=32,
               validation_data=(validation_data, validation_labels))
     model.save_weights(top_model_weights_path)
-    
+    return history
+
+
+def display_stats():
+    '''
+    Plot the training statistics
+    :return:
+    '''
     plt.figure()
     plt.plot(history.history['acc'])
     plt.plot(history.history['val_acc'])
@@ -194,4 +121,5 @@ def bn_training(train_data_dir, validation_data_dir, nb_training_samples,
     
 if __name__ == '__main__':
     save_bottleneck_features()
-    train_top_model()
+    history = train_top_model()
+    display_stats()
