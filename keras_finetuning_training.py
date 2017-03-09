@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from keras.regularizers import l1, l2
 import keras
 from vgg16_lower_part import vgg16_lower_part
-from keras_bottleneck import display_stats
+from keras_bottleneck_train import display_stats
 
 # path to the model weights files.
 weights_path = 'vgg16_weights.h5'

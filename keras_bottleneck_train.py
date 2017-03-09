@@ -114,12 +114,11 @@ def display_stats():
     plt.legend(['train', 'test'], loc='upper left')
     plt.show()
 
-def bn_training(train_data_dir, validation_data_dir, nb_training_samples, 
-                nb_validation_samples, nb_epoch, dropout):
-    save_bottleneck_features()
-    train_top_model()
     
 if __name__ == '__main__':
+    '''
+    Entry point.
+    '''
     save_bottleneck_features()
     history = train_top_model()
     display_stats()

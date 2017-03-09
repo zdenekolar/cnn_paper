@@ -24,7 +24,7 @@ from scipy.spatial import distance
 from sklearn.manifold import TSNE
 
 vgg_path = r'vgg16_weights.h5'
-images_path = r'D:\ConvNet\cnn_paper\data\train - small\1'
+images_path = r'D:\ConvNet\cnn_paper\data\train - small\0'
 num_images = 500
 
 def get_image(path):
